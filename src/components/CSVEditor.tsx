@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import Papa from 'papaparse';
 import { 
   FileUp, 
@@ -22,6 +22,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { CSVData, SortConfig } from '../types';
 import { cn, downloadCSV } from '../lib/utils';
 
+const STORAGE_KEY = 'csv_flow_data';
+
 interface ViewModalState {
   header: string;
   value: string;
@@ -34,7 +36,32 @@ export default function CSVEditor() {
   const [sortConfig, setSortConfig] = useState<SortConfig>(null);
   const [viewingCell, setViewingCell] = useState<ViewModalState | null>(null);
   const [copied, setCopied] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Load from localStorage on mount
+  useEffect(() => {
+    const savedData = localStorage.getItem(STORAGE_KEY);
+    if (savedData) {
+      try {
+        setData(JSON.parse(savedData));
+      } catch (e) {
+        console.error('Failed to parse saved data', e);
+      }
+    }
+    setIsInitialized(true);
+  }, []);
+
+  // Save to localStorage on change
+  useEffect(() => {
+    if (isInitialized) {
+      if (data) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      } else {
+        localStorage.removeItem(STORAGE_KEY);
+      }
+    }
+  }, [data, isInitialized]);
 
   const handleCopyValue = (value: string) => {
     navigator.clipboard.writeText(value);
@@ -172,6 +199,21 @@ export default function CSVEditor() {
 
     setData({ ...data!, rows: sortedRows });
   };
+
+  if (!isInitialized) {
+    return (
+      <div className="min-h-screen bg-[#F0F2F5] flex items-center justify-center">
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="flex flex-col items-center gap-4"
+        >
+          <div className="w-12 h-12 border-4 border-teal-500/20 border-t-teal-500 rounded-full animate-spin"></div>
+          <span className="text-sm font-medium text-gray-400">Loading Flow...</span>
+        </motion.div>
+      </div>
+    );
+  }
 
   if (!data && !isPasting) {
     return (
@@ -365,24 +407,26 @@ export default function CSVEditor() {
         <div className="flex items-center gap-2">
           <button 
             onClick={addRow}
-            className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+            className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors border border-gray-200"
           >
             <Plus className="w-4 h-4" /> Add Row
           </button>
           <button 
             onClick={addColumn}
-            className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors border-r border-gray-200 mr-2 pr-4"
+            className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors border border-gray-200"
           >
             <Plus className="w-4 h-4" /> Add Col
           </button>
           
           <button 
             onClick={clearData}
-            className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-            title="Clear Data"
+            className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-red-100 mr-2"
+            title="Clear Data & Start New"
           >
-            <Undo2 className="w-4 h-4" />
+            <Trash2 className="w-4 h-4" /> Clear All
           </button>
+          
+          <div className="h-6 w-[1px] bg-gray-200 mx-2" />
           
           <button 
             onClick={exportCSV}
